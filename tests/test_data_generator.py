@@ -1,5 +1,4 @@
 import pytest
-import networkx
 import torch
 from loaders.data_generator import generate_regular_graph_netx, noise_edge_swap
 
