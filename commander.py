@@ -96,16 +96,15 @@ def train(config):
     val_loader = siamese_loader(gene_val, batch_size,
                                 first=True, shuffle=False)
     
-    
-    
+        
     """ if not train['anew']:
         try:
             utils.load_model(model,device,train['start_model'])
             print("Model found, using it.")
         except RuntimeError:
             print("Model not existing. Starting from scratch.")
- """
-    #model.to(device)
+    """
+    
     # train model
     checkpoint_callback = ModelCheckpoint(save_top_k=1, mode='max', monitor="val_acc")
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -116,117 +115,37 @@ def train(config):
     else:
         trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,log_every_n_steps=log_freq,callbacks=[lr_monitor, checkpoint_callback],precision=16)
     trainer.fit(model_pl, train_loader, val_loader)
-    #trainer.fit(model_pl, val_loader, val_loader)
-    wandb.finish()
-    return trainer
+    
+    #wandb.finish()
+    return trainer, model_pl
 
 
 
-def test(config):
+def test(config, trainer=None, model_trained=None):
     """ Main func.
     """
     cpu = config['cpu']
-    #train, 
-    #problem =config['problem']
-    #config_arch = config['arch'] 
-    #test_enabled, 
-    #path_log = config['path_log']
     data = config['data']
-    #max_epochs = config['train']['epochs']
-    batch_size = 1#config['train']['batch_size']
-    #config_optim = config['train']
-    #log_freq = config_optim['log_freq']
+    batch_size = 1
 
-    #print("Heading to Test.")
-    #global best_score, best_epoch
-    #best_score, best_epoch = -1, -1
-    #print("Current problem : ", problem)
-
-    use_cuda = not cpu and torch.cuda.is_available()
-    device = 'cuda' if use_cuda else 'cpu'
-    print('Using device:', device)
-
-    # init random seeds 
-    utils.setup_env(cpu)
-    
-    #print("Models saved in ", path_log)
-    #exp_helper = init_helper(problem) 
-    #model_pl = get_siamese_model_exp(config_arch, config_optim)
-    model = get_siamese_model_test(data['test']['path_model'])
-
-    path_data_test = os.path.join(data['path_dataset'], 'test/')
-    utils.check_dir(path_data_test)
     generator = dg.QAP_Generator
-    #generator = dg.QAP_spectralGenerator
-    gene_test = generator('test', data['test'], path_data_test)
+    gene_test = generator('test', data['test'], data['path_dataset'])
     gene_test.load_dataset()
-    #gene_val = generator('val', data['train'], data['path_dataset'])
-    #gene_val.load_dataset()
     test_loader = siamese_loader(gene_test, batch_size,
-                                  gene_test.constant_n_vertices, shuffle=False)
-    #val_loader = siamese_loader(gene_val, batch_size,
-    #                            gene_val.constant_n_vertices, shuffle=False)
+                                  first=True, shuffle=False)
     
-    
-    #optimizer, scheduler = get_optimizer(train,model)
-    #print("Model #parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
-
     """ if not train['anew']:
         try:
             utils.load_model(model,device,train['start_model'])
             print("Model found, using it.")
         except RuntimeError:
             print("Model not existing. Starting from scratch.")
- """
-    #model.to(device)
-
-    trainer = pl.Trainer(accelerator=device,precision=16)
-    res_test = trainer.test(model, test_loader)
+    """
+    res_test = trainer.test(model_trained, test_loader)
+    wandb.finish()
     return res_test
-    #return trainer
-#@ex.command
-""" def eval(cpu, train, arch, data, use_dgl, problem, use_model=None):
-    print("Heading to evaluation.")
-
-    use_cuda = not cpu and torch.cuda.is_available()
-    device = 'cuda' if use_cuda else 'cpu'
-    print('Using device:', device)
-
-    if use_model is None:
-        model = get_model_gen(arch)
-        model.to(device)
-        model = utils.load_model(model, device, train['start_model'])
-    else:
-        model = use_model
     
-    helper = init_helper(problem)
 
-    if use_dgl:
-        print(f"Arch : {arch['arch_gnn']}")
-        from loaders.siamese_loaders import get_uncollate_function
-        uncollate_function = get_uncollate_function(data['test']['n_vertices'],problem)
-        cur_crit = helper.criterion
-        cur_eval = helper.eval_function
-        helper.criterion = lambda output, target : cur_crit(uncollate_function(output), target)
-        helper.eval_function = lambda output, target : cur_eval(uncollate_function(output), target)
-
-
-    gene_test = helper.generator('test', data['test'], data['path_dataset'])
-    gene_test.load_dataset(use_dgl)
-    test_loader = get_loader(use_dgl,gene_test, train['batch_size'],
-                                 gene_test.constant_n_vertices,problem=problem)
-    
-    relevant_metric, loss = trainer.val_triplet(test_loader, model, helper, device,
-                                    epoch=0, eval_score=True,
-                                    val_test='test')
-     """
-    #key = create_key()
-    #filename_test = os.path.join(log_dir,  output_filename)
-    #print('Saving result at: ',filename_test)
-    #metric_to_save = helper.get_relevant_metric_with_name('test')
-    #utils.save_to_json(key, loss, metric_to_save, filename_test)
-
-#@ex.automain
 def main():
     parser = argparse.ArgumentParser(description='Main file for creating experiments.')
     parser.add_argument('command', metavar='c', choices=['train','test', 'tune'],
@@ -240,8 +159,8 @@ def main():
     args = parser.parse_args()
     if args.command=='train':
         training=True
-        default_test = False  
-    elif args.command=='test':
+        default_test = True  
+    elif args.command=='test': # will not work!
         training=False
         default_test = True
     
@@ -269,9 +188,9 @@ def main():
     config = check_paths_update(config, name)
     trainer=None
     if training:
-        trainer = train(config)
+        trainer, model_trained = train(config)
     if default_test: #or config['test_enabled']:
-        res_test = test(config)
+        res_test = test(config, trainer, model_trained)
 
 if __name__=="__main__":
     pl.seed_everything(3787, workers=True)
