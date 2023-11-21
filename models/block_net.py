@@ -1,6 +1,6 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+#import torch
+#import torch.nn as nn
+#import torch.nn.functional as F
 from models.layers import *
 
 def block_emb(in_features, out_features, depth_of_mlp, constant_n_vertices=True):
@@ -61,10 +61,10 @@ def node_embedding(original_features_num, num_blocks, in_features,out_features, 
     return d
 
 def node_embedding_node(original_features_num, num_blocks, in_features,out_features, depth_of_mlp,
-     block=block, constant_n_vertices=True, **kwargs):
+     block_inside=block, constant_n_vertices=True, **kwargs):
     d = {'in': Identity()}
     d['emb'] = block_emb(original_features_num, out_features, depth_of_mlp)
-    d['bm'] = base_model(out_features, num_blocks, in_features, out_features, depth_of_mlp, block, constant_n_vertices=constant_n_vertices)
+    d['bm'] = base_model(out_features, num_blocks, in_features, out_features, depth_of_mlp, block_inside, constant_n_vertices=constant_n_vertices)
     d['bm_out'] = ColumnMaxPooling()
     d['skip'] = (Identitynn(), ['in'])
     d['node_emb'] = node_emb(original_features_num, out_features, depth_of_mlp)

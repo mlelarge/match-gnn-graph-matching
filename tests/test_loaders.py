@@ -15,7 +15,7 @@ args = {'generative_model': 'ErdosRenyi',
         'edge_density': 0.5,
         'noise': 0.2,
         'num_examples_fake': 20,
-        'n_vertices': 100,
+        'n_vertices': 33,
         'vertex_proba': 1.0
         }
 
@@ -34,7 +34,7 @@ def make_args():
         all_args.append(new_args)
     return all_args
 
-k = 11
+k = 7
 
 def test_data(make_args):
     for args in make_args:
@@ -42,5 +42,6 @@ def test_data(make_args):
         qap_gen.load_dataset()
         assert qap_gen[k][0].shape == qap_gen[k][1].shape
         assert qap_gen[k][0].shape[-2:] == qap_gen[k][2].shape
+        assert (qap_gen[k][2] == qap_gen[k-1][2]).all
         qap_gen.remove_file()
     pass

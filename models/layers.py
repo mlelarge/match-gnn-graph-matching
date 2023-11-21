@@ -36,11 +36,9 @@ class GraphNorm(nn.Module):
             return normalize(b, constant_n_vertices=self.constant_n_vertices, eps=self.eps)
 
 def normalize(b, constant_n_vertices=True, eps =1e-05):
-    #non_zero_mask = (b != 0).float().detach()
+    # b.shape = (b,f,n1,n2) or (b,f,n)
     means = torch.mean(b, dim = (-1,-2), keepdim=True) #.detach()
     vars = torch.var(b, unbiased=False,dim = (-1,-2), keepdim=True) #.detach()
-    #(b,f,n1,n2) = b.shape
-    #assert n1 == n2
     if constant_n_vertices:
         n = b.size(-1)
     else:
@@ -84,13 +82,13 @@ class MlpBlock_Node(nn.Module):
             self.convs.append(nn.Conv1d(in_features, out_features, kernel_size=1, padding=0, bias=True))
             _init_weights(self.convs[-1])
             in_features = out_features
-        self.norm_out = nn.InstanceNorm2d(out_features, affine=False)
+        
 
     def forward(self, inputs):
         out = inputs
         for conv_layer in self.convs[:-1]:
             out = self.activation(conv_layer(out))
-        return self.norm_out(self.convs[-1](out))
+        return normalize(self.convs[-1](out)) 
    
 def _init_weights(layer):
     """
