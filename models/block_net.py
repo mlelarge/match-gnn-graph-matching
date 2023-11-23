@@ -1,6 +1,3 @@
-#import torch
-#import torch.nn as nn
-#import torch.nn.functional as F
 from models.layers import *
 
 def block_emb(in_features, out_features, depth_of_mlp, constant_n_vertices=True):
@@ -53,15 +50,17 @@ def base_model(original_features_num, num_blocks, in_features, out_features, dep
     d['block'+str(num_blocks)] = block(last_layer_features, out_features, depth_of_mlp, constant_n_vertices=constant_n_vertices)
     return d
 
-def node_embedding(original_features_num, num_blocks, in_features,out_features, depth_of_mlp,
-     block=block, constant_n_vertices=True, **kwargs):
+def node_embedding(original_features_num, num_blocks, 
+                   in_features, out_features, depth_of_mlp,
+                   block_inside=block, constant_n_vertices=True, **kwargs):
     d = {'in': Identity()}
-    d['bm'] = base_model(original_features_num, num_blocks, in_features,out_features, depth_of_mlp, block, constant_n_vertices=constant_n_vertices)
+    d['bm'] = base_model(original_features_num, num_blocks, in_features,out_features, depth_of_mlp, block_inside, constant_n_vertices=constant_n_vertices)
     d['suffix'] = ColumnMaxPooling()
     return d
 
-def node_embedding_node(original_features_num, num_blocks, in_features,out_features, depth_of_mlp,
-     block_inside=block, constant_n_vertices=True, **kwargs):
+def node_embedding_node(original_features_num, num_blocks, 
+                        in_features, out_features, depth_of_mlp,
+                        block_inside=block, constant_n_vertices=True, **kwargs):
     d = {'in': Identity()}
     d['emb'] = block_emb(original_features_num, out_features, depth_of_mlp)
     d['bm'] = base_model(out_features, num_blocks, in_features, out_features, depth_of_mlp, block_inside, constant_n_vertices=constant_n_vertices)

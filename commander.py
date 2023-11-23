@@ -189,7 +189,7 @@ def main():
     trainer=None
     if training:
         trainer, model_trained = train(config)
-    if default_test: #or config['test_enabled']:
+    if default_test:
         res_test = test(config, trainer, model_trained)
 
 if __name__=="__main__":

@@ -12,9 +12,9 @@ get_node_emb = {
     'node_embedding_node': node_embedding_node
     }
 
-get_block_init = {
-    'block_emb': block_emb
-}
+#get_block_init = {
+#    'block_emb': block_emb
+#}
     
 get_block_inside = {
     'block': block,
@@ -31,31 +31,36 @@ class Siamese_Node(pl.LightningModule):
         graphs must NOT have same size inside the batch when maskedtensors are used
         """
         super().__init__()
-        #print(node_emb)
+        node_emb_args = {'original_features_num': original_features_num, 
+                         'num_blocks': node_emb['num_blocks'], 
+                        'in_features': node_emb['in_features'], 
+                        'out_features': node_emb['out_features'], 
+                        'depth_of_mlp': node_emb['depth_of_mlp'],
+                        }
         try:
             node_emb_type = get_node_emb[node_emb['type']]
         except KeyError:
             raise NotImplementedError(f"node embedding {node_emb['type']} is not implemented")
         try:
             block_inside = get_block_inside[node_emb['block_inside']]
-            node_emb['block_inside'] = block_inside
+            node_emb_args['block_inside'] = block_inside
         except KeyError:
             raise NotImplementedError(f"block inside {node_emb['block_inside']} is not implemented")
-        try:
-            block_init = get_block_init[node_emb['block_init']]
-            node_emb['block_init'] = block_init
-        except KeyError:
-            raise NotImplementedError(f"block init {node_emb['block_init']} is not implemented")
+        #try:
+        #    block_init = get_block_init[node_emb['block_init']]
+        #    node_emb_args['block_init'] = block_init
+        #except KeyError:
+        #    raise NotImplementedError(f"block init {node_emb['block_init']} is not implemented")
 
         self.out_features = node_emb['out_features']
-        #print(node_emb)
+        
         self.node_embedder_dic = {
             'input': (None, []), 
-            'ne':  node_emb_type(original_features_num, **node_emb)
+            'ne':  node_emb_type(**node_emb_args)
                 }
         self.node_embedder = Network(self.node_embedder_dic)
         
-        self.loss = nn.CrossEntropyLoss(reduction='mean') #triplet_loss() #
+        self.loss = nn.CrossEntropyLoss(reduction='mean')
         self.metric = accuracy_max #accuracy_linear_assignment #
         self.lr = lr
         self.scheduler_decay = scheduler_decay
