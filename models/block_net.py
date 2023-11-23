@@ -68,5 +68,5 @@ def node_embedding_node(original_features_num, num_blocks,
     d['skip'] = (Identitynn(), ['in'])
     d['node_emb'] = node_emb(original_features_num, out_features, depth_of_mlp)
     d['node_out'] = Identitynn()
-    d['suffix'] = ((Concat(), ['bm_out', 'node_out']))
+    d['suffix'] = (Concat(), ['bm_out', 'node_out'])
     return d

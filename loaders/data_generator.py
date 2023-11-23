@@ -223,3 +223,30 @@ class QAP_Generator(Base_Generator):
         B = adjacency_matrix_to_tensor_representation(W)
         B_noise = adjacency_matrix_to_tensor_representation(W_noise)
         return (B, B_noise)
+    
+
+from scipy.optimize import linear_sum_assignment
+
+def get_best_guess(weight, graph1, graph2):
+    row_ind, col_ind = linear_sum_assignment(weight,maximize=True)
+    #maxi = -weight[row_ind,col_ind]
+    maxi = (graph1 * graph2[col_ind,:][:,col_ind]).sum(1)
+    return np.argsort(maxi), col_ind
+
+def all_seed(loader, model, device='cuda'):
+    ind_data = []
+    model = model.to(device)
+    with torch.no_grad():
+        for (data1, data2, _) in loader:
+            data1['input'] = data1['input'].to(device)
+            data2['input'] = data2['input'].to(device)
+            weights = model(data1, data2)
+            #weights = torch.log_softmax(rawscores,-1)
+            g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
+            g2 = data2['input'][:,0,:,:].cpu().detach().numpy()
+            for i, weight in enumerate(weights):
+                cost = weight.cpu().detach().numpy()
+                ind1, col_ind = get_best_guess(cost, g1[i], g2[i])
+                ind2 = col_ind[ind1]
+                ind_data.append((ind1,ind2))
+    return ind_data

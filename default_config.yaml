@@ -23,11 +23,10 @@ data:
         vertex_proba: 1. # Parameter of the binomial distribution of vertices
         noise: 0.4
         
-
 train: # Training parameters
-    epochs: 40 
+    epochs: 10 
     batch_size:  64 
-    lr: !!float 1e-4
+    lr: !!float 1e-3
     scheduler_step: 3
     scheduler_decay: 0.5
     lr_stop: !!float 1e-7
@@ -38,7 +37,7 @@ train: # Training parameters
 arch: # Architecture and model
     node_emb: 
         type: node_embedding_node
-        block_init: block_emb
+        #block_init: block_emb
         block_inside: block_res
         num_blocks: 9
         in_features: 32
