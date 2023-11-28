@@ -195,7 +195,12 @@ def seqtrain(model, labels, gene_train, gene_val, config, L=0):
                              callbacks=[lr_monitor, checkpoint_callback],precision=16)
     trainer.fit(model, train_loader, val_loader)
     
-
+    del train_loader
+    del val_loader
+    train_loader = siamese_loader(gene_train, batch_size,
+                                  first=True,  shuffle=False)
+    val_loader = siamese_loader(gene_val, batch_size,
+                                first=True, shuffle=False)
     ind_data_train = dg.all_seed(train_loader,model,device)
     ind_data_val = dg.all_seed(val_loader,model,device)
     wandb.finish()
