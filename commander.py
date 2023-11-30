@@ -8,6 +8,7 @@ import wandb
 import torch
 #import torch.backends.cudnn as cudnn
 from models import get_siamese_model
+#from models_old import get_siamese_model
 import loaders.data_generator as dg
 from loaders.loaders import siamese_loader
 
@@ -19,7 +20,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
 
-def get_config(filename='default_config.yaml') -> dict:
+def get_config(filename) -> dict:
     with open(filename, 'r') as f:
         config = yaml.safe_load(f)
     return config
@@ -132,6 +133,7 @@ def train(config , training_seq = False):
     trainer.fit(model_pl, train_loader, val_loader)
     
     if training_seq:
+        del train_loader
         train_loader = siamese_loader(gene_train, batch_size,
                                   first=True,  shuffle=False)
         ind_data_train = dg.all_seed(train_loader,model_pl,device)
@@ -170,10 +172,13 @@ def test(config, trainer=None, model_trained=None):
     wandb.finish()
     return res_test
 
-def seqtrain(model, labels, gene_train, gene_val, config, L=0):
+def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
     path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device = get_param_from_config(config)
 
-    ind_train, ind_val = labels
+    if L>0:
+        max_epochs = int(max_epochs/2)
+
+    
     train_loader = siamese_loader(list(zip(gene_train, ind_train)), batch_size,
                                   first=False,  shuffle=True)
     val_loader = siamese_loader(list(zip(gene_val, ind_val)), batch_size,
@@ -196,11 +201,9 @@ def seqtrain(model, labels, gene_train, gene_val, config, L=0):
     trainer.fit(model, train_loader, val_loader)
     
     del train_loader
-    del val_loader
-    train_loader = siamese_loader(gene_train, batch_size,
-                                  first=True,  shuffle=False)
-    val_loader = siamese_loader(gene_val, batch_size,
-                                first=True, shuffle=False)
+    
+    train_loader = siamese_loader(list(zip(gene_train, ind_train)), batch_size,
+                                  first=False,  shuffle=False)
     ind_data_train = dg.all_seed(train_loader,model,device)
     ind_data_val = dg.all_seed(val_loader,model,device)
     wandb.finish()
@@ -208,7 +211,7 @@ def seqtrain(model, labels, gene_train, gene_val, config, L=0):
     del train_loader
     del val_loader
 
-    return model, (ind_data_train, ind_data_val)
+    return model, ind_data_train, ind_data_val
         
 
 
@@ -223,6 +226,7 @@ def main():
     parser.add_argument('--block_init', type=str, default='block')
     parser.add_argument('--block_inside', type=str, default='block_inside')
     parser.add_argument('--node_emb', type=str, default='node_embedding_block')
+    parser.add_argument('--config', type=str, default='default_config.yaml')
     args = parser.parse_args()
     
     training=False
@@ -238,7 +242,7 @@ def main():
         default_test = True
     
 
-    config = get_config()
+    config = get_config(args.config)
     if args.n_vertices != 0:
         config['data']['train']['n_vertices'] = args.n_vertices
     if args.noise != 0:
@@ -267,11 +271,11 @@ def main():
     if training_seq:
         gene_train, gene_val = get_data(config)
         new_config = copy.deepcopy(config)
-        new_config['arch']['seed'] = -1
+        new_config['arch']['size_seed'] = -1
         model = get_siamese_model(new_config['arch'], new_config['train'])
-        labels = (ind_data_train, ind_data_val)
-        for L in range(10):
-            model, labels = seqtrain(model, labels, gene_train, gene_val, new_config, L=L)
+        ind_train, ind_val = ind_data_train, ind_data_val
+        for L in range(30):
+            model, ind_train, ind_val = seqtrain(model, ind_train, ind_val, gene_train, gene_val, new_config, L=L)
             
 
 if __name__=="__main__":

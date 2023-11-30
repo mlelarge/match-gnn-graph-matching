@@ -240,8 +240,8 @@ def all_seed(loader, model, device='cuda'):
         for (data1, data2, _) in loader:
             data1['input'] = data1['input'].to(device)
             data2['input'] = data2['input'].to(device)
-            weights = model(data1, data2)
-            #weights = torch.log_softmax(rawscores,-1)
+            rawscores = model(data1, data2)
+            weights = torch.log_softmax(rawscores,-1)
             g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
             g2 = data2['input'][:,0,:,:].cpu().detach().numpy()
             for i, weight in enumerate(weights):
