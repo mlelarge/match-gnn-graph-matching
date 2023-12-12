@@ -137,6 +137,6 @@ class Seed(nn.Module):
         
     def forward(self, x):
         n = x.size(-1)
-        mask = x[:,1,:,:] > (n-self.size_seed)/n
+        mask = x[:,1,:,:] > (n-self.size_seed-1)/n
         x[:,1,:,:] = mask*x[:,1,:,:]
         return x

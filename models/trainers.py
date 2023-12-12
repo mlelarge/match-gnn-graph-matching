@@ -4,7 +4,7 @@ import torch.nn as nn
 from toolbox.metrics import accuracy_max, accuracy_linear_assignment
 from models.block_net import *
 from models.utils import *
-from models.layers import Seed, Identity
+#from models.layers import Seed, Identity
 
 
 get_node_emb = {
@@ -22,7 +22,7 @@ get_block_inside = {
     }
 
 class Siamese_Node(pl.LightningModule):
-    def __init__(self, original_features_num, node_emb, size_seed=-1, lr=1e-3, scheduler_decay=0.5, scheduler_step=3, lr_stop = 1e-5):
+    def __init__(self, original_features_num, node_emb, lr=1e-3, scheduler_decay=0.5, scheduler_step=3, lr_stop = 1e-5):
         """
         take a batch of pair of graphs as
         (bs, original_features, n_vertices, n_vertices)
@@ -66,19 +66,21 @@ class Siamese_Node(pl.LightningModule):
         self.scheduler_decay = scheduler_decay
         self.scheduler_step = scheduler_step
         self.lr_stop = lr_stop
-        if size_seed == -1:
-            self.size_seed = -1
-            self.seed = Identity()
-        else:
-            self.size_seed = size_seed
-            self.seed = Seed(size_seed)
+        #if size_seed == -1:
+        #    self.size_seed = -1
+        #    self.seed = Identity()
+        #else:
+        #    self.size_seed = size_seed
+        #    self.seed = Seed(size_seed)
         
     def forward(self, x1, x2 , verbose =False):
         """
         Data should be given with the shape (b,2,f,n,n)
         """
-        x1 = self.node_embedder({'input': self.seed(x1['input'])})['ne/suffix']
-        x2 = self.node_embedder({'input': self.seed(x2['input'])})['ne/suffix']
+        #x1 = self.node_embedder({'input': self.seed(x1['input'])})['ne/suffix']
+        #x2 = self.node_embedder({'input': self.seed(x2['input'])})['ne/suffix']
+        x1 = self.node_embedder(x1)['ne/suffix']
+        x2 = self.node_embedder(x2)['ne/suffix']
         #raw_scores = torch.einsum('bfi,bfj-> bij', x1, x2)
         raw_scores = torch.matmul(torch.transpose(x1,1,2),x2)
         if verbose:

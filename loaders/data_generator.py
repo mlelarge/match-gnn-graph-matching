@@ -7,6 +7,7 @@ import os
 import tqdm
 from more_itertools import chunked
 import toolbox.utils as utils
+import copy
 
 GENERATOR_FUNCTIONS = {}
 
@@ -233,7 +234,25 @@ def get_best_guess(weight, graph1, graph2):
     maxi = (graph1 * graph2[col_ind,:][:,col_ind]).sum(1)
     return np.argsort(maxi), col_ind
 
-def all_seed(loader, model, device='cuda'):
+
+def make_mask_hard(diag1, diag2, size_seed):
+    n = diag1.shape[-1]
+    diag1_seed = diag1 * (diag1 > (n-size_seed-1)/n)
+    diag2_seed = diag2 * (diag2 > (n-size_seed-1)/n)
+    ones_asdiag = torch.ones_like(diag1)
+    mat1 = torch.einsum('bi,bj->bij', diag1_seed, ones_asdiag)
+    mat2 = torch.einsum('bi,bj->bij', ones_asdiag, diag2_seed)
+    mask01 = mat1 == 0
+    mask02 = mat2 == 0
+    mask = mat1 == mat2
+    return mask *(torch.logical_not(mask01+mask02))
+
+def make_mask_soft(diag1, diag2):
+    bs, n = diag1.shape
+    M = diag1[:, :, None] == diag2[:, None, :]
+    return -(torch.ones(bs,n,n) - M.to(torch.float))
+
+def all_seed(loader, model, size_seed=0, hard_seed=True, device='cuda'):
     ind_data = []
     model = model.to(device)
     with torch.no_grad():
@@ -241,12 +260,35 @@ def all_seed(loader, model, device='cuda'):
             data1['input'] = data1['input'].to(device)
             data2['input'] = data2['input'].to(device)
             rawscores = model(data1, data2)
+            rawscores = rawscores.cpu().detach()
+            if size_seed > 0:
+                if hard_seed:
+                    diag1 = torch.diagonal(data1['input'][:,1,:,:], dim1=-2,dim2=-1).cpu().detach()
+                    diag2 = torch.diagonal(data2['input'][:,1,:,:], dim1=-2,dim2=-1).cpu().detach()
+                    mask = make_mask_hard(diag1, diag2, size_seed)
+                else:
+                    #m1 = (data1['input'][:,1,:,:].cpu().detach()>0).to(torch.float)
+                    #m2 = (data2['input'][:,1,:,:].cpu().detach()>0).to(torch.float)
+                    diag1 = torch.diagonal(data1['input'][:,0,:,:], dim1=-2,dim2=-1).cpu().detach()
+                    diag2 = torch.diagonal(data2['input'][:,0,:,:], dim1=-2,dim2=-1).cpu().detach()
+                    mask = make_mask_soft(diag1,diag2)
+                rawscores = rawscores+500.*mask
             weights = torch.log_softmax(rawscores,-1)
-            g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
-            g2 = data2['input'][:,0,:,:].cpu().detach().numpy()
+            g1 = copy.deepcopy(data1['input'][:,0,:,:].cpu().detach().numpy())
+            g2 = copy.deepcopy(data2['input'][:,0,:,:].cpu().detach().numpy())
+            if size_seed > 0:
+                bs,n,_ = g1.shape
+                if hard_seed:
+                    g1[:,range(n), range(n)] = np.ones((bs,n))
+                    g2[:,range(n-size_seed,n),range(n-size_seed,n)] = n*np.ones((bs, size_seed))
+                else:
+                    g1[:,range(n), range(n)] = np.zeros((bs,n))
+                    g2[:,range(n), range(n)] = np.zeros((bs,n))
             for i, weight in enumerate(weights):
                 cost = weight.cpu().detach().numpy()
                 ind1, col_ind = get_best_guess(cost, g1[i], g2[i])
                 ind2 = col_ind[ind1]
                 ind_data.append((ind1,ind2))
+            del g1
+            del g2
     return ind_data

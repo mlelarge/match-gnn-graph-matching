@@ -8,8 +8,8 @@ import wandb
 import torch
 #import torch.backends.cudnn as cudnn
 from models import get_siamese_model
-#from models_old import get_siamese_model
 import loaders.data_generator as dg
+import loaders.preprocess as prep
 from loaders.loaders import siamese_loader
 
 import toolbox.utils as utils
@@ -18,7 +18,7 @@ from pathlib import Path
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 def get_config(filename) -> dict:
     with open(filename, 'r') as f:
@@ -77,7 +77,11 @@ def get_param_from_config(config):
 
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
-    return path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device
+    size_seed = config['data']['train']['size_seed']
+    hard_seed = config['data']['train']['hard_seed']
+    if size_seed>0 and not hard_seed:
+        size_seed = int(config['data']['train']['n_vertices']/size_seed)
+    return path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed
 
 def get_data(config):
     data = config['data']
@@ -86,13 +90,26 @@ def get_data(config):
     gene_train.load_dataset()
     gene_val = generator('val', data['train'], data['path_dataset'])
     gene_val.load_dataset()
+    size_seed = data['train']['size_seed']
+    hard_seed = data['train']['hard_seed']
+    if size_seed > 0:
+        if hard_seed:
+            gene_train = prep.make_hardseed(gene_train,size_seed)
+            gene_val = prep.make_hardseed(gene_val, size_seed)
+        else:
+            size_blocks = int(data['train']['n_vertices']/size_seed)
+            gene_train = prep.make_softseed(gene_train, size_blocks)
+            gene_val = prep.make_softseed(gene_val, size_blocks)
+    else:
+        gene_train = prep.make_noseed(gene_train)
+        gene_val = prep.make_noseed(gene_val)
     return gene_train, gene_val
 
 
 def train(config , training_seq = False):
     """ Main func.
     """
-    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device = get_param_from_config(config)
+    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed = get_param_from_config(config)
 
     print("Heading to Training.")
     #global best_score, best_epoch
@@ -103,10 +120,8 @@ def train(config , training_seq = False):
     model_pl = get_siamese_model(config_arch, config_optim) 
 
     gene_train, gene_val = get_data(config)
-    train_loader = siamese_loader(gene_train, batch_size,
-                                  first=True,  shuffle=True)
-    val_loader = siamese_loader(gene_val, batch_size,
-                                first=True, shuffle=False)
+    train_loader = siamese_loader(gene_train, batch_size,shuffle=True)
+    val_loader = siamese_loader(gene_val, batch_size, shuffle=False)
     
     """ if not train['anew']:
         try:
@@ -122,7 +137,8 @@ def train(config , training_seq = False):
     if config['observers']['wandb']:
         logger = WandbLogger(project=f"{config['name']}", log_model="all", 
                              save_dir=path_log)
-        logger.experiment.config.update(config)
+        if rank_zero_only.rank == 0:
+            logger.experiment.config.update(config)
         trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,
                              logger=logger,log_every_n_steps=log_freq,
                              callbacks=[lr_monitor, checkpoint_callback],precision=16)
@@ -134,10 +150,9 @@ def train(config , training_seq = False):
     
     if training_seq:
         del train_loader
-        train_loader = siamese_loader(gene_train, batch_size,
-                                  first=True,  shuffle=False)
-        ind_data_train = dg.all_seed(train_loader,model_pl,device)
-        ind_data_val = dg.all_seed(val_loader,model_pl,device)
+        train_loader = siamese_loader(gene_train, batch_size, shuffle=False)
+        ind_data_train = dg.all_seed(train_loader,model_pl,size_seed,hard_seed,device)
+        ind_data_val = dg.all_seed(val_loader,model_pl,size_seed,hard_seed,device)
     
     del train_loader
     del val_loader
@@ -158,8 +173,7 @@ def test(config, trainer=None, model_trained=None):
     generator = dg.QAP_Generator
     gene_test = generator('test', data['test'], data['path_dataset'])
     gene_test.load_dataset()
-    test_loader = siamese_loader(gene_test, batch_size,
-                                  first=True, shuffle=False)
+    test_loader = siamese_loader(gene_test, batch_size, shuffle=False)
     
     """ if not train['anew']:
         try:
@@ -173,16 +187,15 @@ def test(config, trainer=None, model_trained=None):
     return res_test
 
 def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
-    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device = get_param_from_config(config)
+    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed = get_param_from_config(config)
 
     if L>0:
         max_epochs = int(max_epochs/2)
 
-    
-    train_loader = siamese_loader(list(zip(gene_train, ind_train)), batch_size,
-                                  first=False,  shuffle=True)
-    val_loader = siamese_loader(list(zip(gene_val, ind_val)), batch_size,
-                                first=False, shuffle=False)
+    new_train = prep.make_seed_from_ind_label(gene_train, ind_train)
+    new_val = prep.make_seed_from_ind_label(gene_val,ind_val)
+    train_loader = siamese_loader(new_train, batch_size, shuffle=True)
+    val_loader = siamese_loader(new_val, batch_size, shuffle=False)
     
     # train model
     checkpoint_callback = ModelCheckpoint(save_top_k=1, mode='max', monitor="val_acc")
@@ -190,7 +203,8 @@ def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
     if config['observers']['wandb']:
         logger = WandbLogger(project=f"{config['name']}", log_model="all", 
                              save_dir=path_log)
-        logger.experiment.config.update(config)
+        if rank_zero_only.rank == 0:
+            logger.experiment.config.update(config)
         trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,
                              logger=logger,log_every_n_steps=log_freq,
                              callbacks=[lr_monitor, checkpoint_callback],precision=16)
@@ -202,10 +216,9 @@ def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
     
     del train_loader
     
-    train_loader = siamese_loader(list(zip(gene_train, ind_train)), batch_size,
-                                  first=False,  shuffle=False)
-    ind_data_train = dg.all_seed(train_loader,model,device)
-    ind_data_val = dg.all_seed(val_loader,model,device)
+    train_loader = siamese_loader(new_train, batch_size, shuffle=False)
+    ind_data_train = dg.all_seed(train_loader,model,size_seed,hard_seed,device)
+    ind_data_val = dg.all_seed(val_loader,model,size_seed,hard_seed,device)
     wandb.finish()
     del trainer
     del train_loader
@@ -270,14 +283,13 @@ def main():
         res_test = test(config, trainer, model_trained)
     if training_seq:
         gene_train, gene_val = get_data(config)
-        new_config = copy.deepcopy(config)
-        new_config['arch']['size_seed'] = -1
-        model = get_siamese_model(new_config['arch'], new_config['train'])
+        #new_config = copy.deepcopy(config)
+        #new_config['arch']['size_seed'] = -1
+        model = get_siamese_model(config['arch'], config['train'])
         ind_train, ind_val = ind_data_train, ind_data_val
-        for L in range(30):
-            model, ind_train, ind_val = seqtrain(model, ind_train, ind_val, gene_train, gene_val, new_config, L=L)
+        for L in range(20):
+            model, ind_train, ind_val = seqtrain(model, ind_train, ind_val, gene_train, gene_val, config,L=L)
             
-
 if __name__=="__main__":
     pl.seed_everything(3787, workers=True)
     main()

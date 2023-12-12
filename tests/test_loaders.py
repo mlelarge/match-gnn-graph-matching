@@ -1,5 +1,7 @@
 import pytest
 from pathlib import Path
+import numpy as np
+import torch
 
 from loaders.data_generator import QAP_Generator
 
@@ -43,5 +45,12 @@ def test_data(make_args):
         assert qap_gen[k][0].shape == qap_gen[k][1].shape
         assert qap_gen[k][0].shape[-2:] == qap_gen[k][2].shape
         assert (qap_gen[k][2] == qap_gen[k-1][2]).all
+        label = np.argmax(qap_gen[k][2].numpy(),1)
+        graph1 = qap_gen[k][0][0,:,:].numpy()
+        graph2 = qap_gen[k][1][0,:,:].numpy()
+        assert (np.sum(graph2[label,:][:,label]*graph1) >= np.sum(graph2*graph1))
+        n = qap_gen[k][0].shape[-1]
+        diag = torch.diag(qap_gen[k][0][1,:,:]).numpy()*n
+        assert (label == diag).all
         qap_gen.remove_file()
     pass
