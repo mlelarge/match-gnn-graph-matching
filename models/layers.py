@@ -140,3 +140,48 @@ class Seed(nn.Module):
         mask = x[:,1,:,:] > (n-self.size_seed-1)/n
         x[:,1,:,:] = mask*x[:,1,:,:]
         return x
+    
+import math
+def positional_embedding(timesteps, dim, max_period=1/10000):
+    """
+    Create sinusoidal timestep embeddings.
+
+    :param timesteps: a 2-D Tensor of bs x N indices.
+                      These may be fractional.
+    :param dim: the dimension of the output.
+    :param max_period: controls the minimum frequency of the embeddings.
+    :return: an [bs x N x dim] Tensor of positional embeddings.
+    """
+    half = dim // 2
+    freqs = torch.exp(
+        -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
+    ).to(device=timesteps.device)
+    args = timesteps[:,:, None].float() * freqs[None,None]
+    embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+    if dim % 2:
+        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
+    return embedding
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, dim, max_period=10000):
+        super().__init__()
+        self.time_embed = lambda t: positional_embedding(t,dim=dim, max_period=max_period)
+        self.pe = self._make_pe(dim, dim)
+    
+    def _make_pe(self, dim_in, dim_out):
+        return nn.Sequential(nn.Linear(dim_in, dim_out), nn.SiLU(), nn.Linear(dim_out, dim_out))
+        
+    def forward(self, t):
+        return normalize(self.pe(self.time_embed(t)).permute(0,2,1))
+    
+class Diag_sum(nn.Module):
+    def forward(self, x): return torch.sum(torch.diagonal(x, dim1=-2, dim2=-1),1)
+
+class Conv_norm(nn.Module):
+    def __init__(self, in_features, out_features, bias=True):
+        super().__init__()
+        self.conv = nn.Conv2d(in_features, out_features, kernel_size=1, padding=0, bias=bias)
+        self.gn = GraphNorm(out_features)
+    
+    def forward(self, x):
+        return self.gn(self.conv(x))

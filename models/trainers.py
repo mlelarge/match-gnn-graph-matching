@@ -9,7 +9,8 @@ from models.utils import *
 
 get_node_emb = {
     'node_embedding': node_embedding,
-    'node_embedding_node': node_embedding_node
+    'node_embedding_node': node_embedding_node,
+    'node_embedding_node_pos': node_embedding_node_pos,
     }
 
 #get_block_init = {
@@ -18,7 +19,8 @@ get_node_emb = {
     
 get_block_inside = {
     'block': block,
-    'block_res': block_res
+    'block_res': block_res,
+    'block_res_mem': block_res_mem,
     }
 
 class Siamese_Node(pl.LightningModule):
