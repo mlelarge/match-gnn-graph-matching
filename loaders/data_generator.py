@@ -226,10 +226,15 @@ class QAP_Generator(Base_Generator):
         return (B, B_noise)
     
 
-from scipy.optimize import linear_sum_assignment
+from scipy.optimize import linear_sum_assignment, quadratic_assignment
+from toolbox.metrics import perm2mat
 
-def get_best_guess(weight, graph1, graph2):
+def get_best_guess(weight, graph1, graph2, use_faq = False):
     row_ind, col_ind = linear_sum_assignment(weight,maximize=True)
+    if use_faq:
+        Pp = perm2mat(col_ind)
+        res_qap = quadratic_assignment(graph1,-graph2,method='faq',options={'P0':Pp})
+        col_ind = res_qap['col_ind']
     #maxi = -weight[row_ind,col_ind]
     maxi = (graph1 * graph2[col_ind,:][:,col_ind]).sum(1)
     return np.argsort(maxi), col_ind
@@ -252,7 +257,7 @@ def make_mask_soft(diag1, diag2):
     M = diag1[:, :, None] == diag2[:, None, :]
     return -(torch.ones(bs,n,n) - M.to(torch.float))
 
-def all_seed(loader, model, size_seed=0, hard_seed=True, device='cuda'):
+def all_seed(loader, model, size_seed=0, hard_seed=True, use_faq = False, device='cuda'):
     ind_data = []
     model = model.to(device)
     with torch.no_grad():
@@ -286,7 +291,7 @@ def all_seed(loader, model, size_seed=0, hard_seed=True, device='cuda'):
                     g2[:,range(n), range(n)] = np.zeros((bs,n))
             for i, weight in enumerate(weights):
                 cost = weight.cpu().detach().numpy()
-                ind1, col_ind = get_best_guess(cost, g1[i], g2[i])
+                ind1, col_ind = get_best_guess(cost, g1[i], g2[i], use_faq)
                 ind2 = col_ind[ind1]
                 ind_data.append((ind1,ind2))
             del g1

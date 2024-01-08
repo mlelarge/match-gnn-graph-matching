@@ -97,7 +97,7 @@ def all_acc_qap(loader, model, device):
             if label[i].ndim == 2:
                 new_label = np.argmax(label[i],1)
             planted = (g1[i]*g2[i][new_label,:][:,new_label]).sum()/2
-            acc = np.sum(col_ind == label)
+            acc = np.sum(col_ind == new_label)
             all_qap.append(qap)
             all_acc.append(acc)
             all_planted.append(planted)
@@ -249,7 +249,7 @@ def all_qap_chain(loader, model, device):
         planted = target.cpu().detach().numpy()
         
         n = len(planted[0])
-        bs = planted.shape[0]
+        #bs = planted.shape[0]
         
         for i, weight in enumerate(weights):
             if planted[i].ndim == 2:
@@ -258,8 +258,8 @@ def all_qap_chain(loader, model, device):
             row_ind, col_ind = linear_sum_assignment(cost)
             Pp = perm2mat(col_ind)
             res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':Pp})
-            P_qap = perm2mat(res_qap['col_ind'])
-            P_planted = perm2mat(pl)            
+            #P_qap = perm2mat(res_qap['col_ind'])
+            #P_planted = perm2mat(pl)            
             all_planted.append((g1[i]*g2[i][pl,:][:, pl]).sum()/2)
             all_qap.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
             all_d.append((g1[i]*g2[i][col_ind,:][:, col_ind]).sum()/2)
