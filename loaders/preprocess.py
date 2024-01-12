@@ -80,3 +80,14 @@ def make_softseed(data,size_seed):
     label = [d[2] for d in data]
     #n = data1[0].shape[-1]
     return list((masking_soft(d1,size_seed,l), masking_soft(d2,size_seed), l) for (d1,d2,l) in zip(data1, data2, label))
+
+def preprocess(gene, n_vertices=1, size_seed=0, hard_seed=False):
+    if size_seed > 0:
+        if hard_seed:
+            generate = make_hardseed(gene,size_seed)
+        else:
+            size_blocks = int(n_vertices/size_seed)
+            generate = make_softseed(gene, size_blocks)
+    else:
+        generate = make_noseed(gene)
+    return generate

@@ -8,6 +8,7 @@ import wandb
 import torch
 #import torch.backends.cudnn as cudnn
 from models import get_siamese_model
+from models.pipeline import Pipeline
 import loaders.data_generator as dg
 import loaders.preprocess as prep
 from loaders.loaders import siamese_loader
@@ -81,7 +82,8 @@ def get_param_from_config(config):
     hard_seed = config['data']['train']['hard_seed']
     if size_seed>0 and not hard_seed:
         size_seed = int(config['data']['train']['n_vertices']/size_seed)
-    return path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed
+    use_faq = config['train']['use_faq']
+    return path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed, use_faq
 
 def get_data(config):
     data = config['data']
@@ -92,24 +94,15 @@ def get_data(config):
     gene_val.load_dataset()
     size_seed = data['train']['size_seed']
     hard_seed = data['train']['hard_seed']
-    if size_seed > 0:
-        if hard_seed:
-            gene_train = prep.make_hardseed(gene_train,size_seed)
-            gene_val = prep.make_hardseed(gene_val, size_seed)
-        else:
-            size_blocks = int(data['train']['n_vertices']/size_seed)
-            gene_train = prep.make_softseed(gene_train, size_blocks)
-            gene_val = prep.make_softseed(gene_val, size_blocks)
-    else:
-        gene_train = prep.make_noseed(gene_train)
-        gene_val = prep.make_noseed(gene_val)
+    gene_train = prep.preprocess(gene_train, data['train']['n_vertices'], size_seed, hard_seed)
+    gene_val = prep.preprocess(gene_val, data['train']['n_vertices'], size_seed, hard_seed)
     return gene_train, gene_val
 
 
 def train(config , training_seq = False):
     """ Main func.
     """
-    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed = get_param_from_config(config)
+    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed, use_faq = get_param_from_config(config)
 
     print("Heading to Training.")
     #global best_score, best_epoch
@@ -151,8 +144,8 @@ def train(config , training_seq = False):
     if training_seq:
         del train_loader
         train_loader = siamese_loader(gene_train, batch_size, shuffle=False)
-        ind_data_train = dg.all_seed(train_loader,model_pl,size_seed,hard_seed,device)
-        ind_data_val = dg.all_seed(val_loader,model_pl,size_seed,hard_seed,device)
+        ind_data_train = dg.all_seed(train_loader,model_pl,size_seed,hard_seed,use_faq,device)
+        ind_data_val = dg.all_seed(val_loader,model_pl,size_seed,hard_seed,use_faq,device)
     
     del train_loader
     del val_loader
@@ -162,6 +155,54 @@ def train(config , training_seq = False):
         return trainer, model_pl, ind_data_train, ind_data_val
     else:
         return trainer, model_pl, None, None
+
+def chain(config , training_seq = False):
+    """ Main func.
+    """
+    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed, use_faq = get_param_from_config(config)
+
+    print("Heading to Chaining.")
+    path_config = config['train']['start_model']
+    pipeline = Pipeline(path_config,DATA_PB_DIR)
+    noise = config['data']['train']['noise']
+    model_pl, dataset_train, dataset_val = pipeline.get_model_datasets(noise, max_iter=10)
+
+    print("Heading to Training.")
+    train_loader = siamese_loader(dataset_train, batch_size,shuffle=True)
+    val_loader = siamese_loader(dataset_val, batch_size, shuffle=False)
+
+    
+    # train model
+    checkpoint_callback = ModelCheckpoint(save_top_k=1, mode='max', monitor="val_acc")
+    lr_monitor = LearningRateMonitor(logging_interval='epoch')
+    if config['observers']['wandb']:
+        logger = WandbLogger(project=f"{config['name']}", log_model="all", 
+                             save_dir=path_log)
+        if rank_zero_only.rank == 0:
+            logger.experiment.config.update(config)
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,
+                             logger=logger,log_every_n_steps=log_freq,
+                             callbacks=[lr_monitor, checkpoint_callback],precision=16)
+    else:
+        trainer = pl.Trainer(accelerator=device,max_epochs=max_epochs,
+                             log_every_n_steps=log_freq,
+                             callbacks=[lr_monitor, checkpoint_callback],precision=16)
+    trainer.fit(model_pl, train_loader, val_loader)
+    
+    if training_seq:
+        del train_loader
+        train_loader = siamese_loader(dataset_train, batch_size, shuffle=False)
+        ind_data_train = dg.all_seed(train_loader,model_pl,size_seed,hard_seed,use_faq,device)
+        ind_data_val = dg.all_seed(val_loader,model_pl,size_seed,hard_seed,use_faq,device)
+    
+    del train_loader
+    del val_loader
+
+    if training_seq:
+        wandb.finish()
+        return model_pl, ind_data_train, ind_data_val
+    else:
+        return model_pl, None, None
 
 
 def test(config, trainer=None, model_trained=None):
@@ -187,7 +228,7 @@ def test(config, trainer=None, model_trained=None):
     return res_test
 
 def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
-    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed = get_param_from_config(config)
+    path_log, config_arch, config_optim, batch_size, max_epochs, batch_size, log_freq, device, size_seed, hard_seed, use_faq = get_param_from_config(config)
 
     if L>0:
         max_epochs = int(max_epochs/2)
@@ -217,8 +258,8 @@ def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
     del train_loader
     
     train_loader = siamese_loader(new_train, batch_size, shuffle=False)
-    ind_data_train = dg.all_seed(train_loader,model,size_seed,hard_seed,device)
-    ind_data_val = dg.all_seed(val_loader,model,size_seed,hard_seed,device)
+    ind_data_train = dg.all_seed(train_loader,model,size_seed,hard_seed,use_faq,device)
+    ind_data_val = dg.all_seed(val_loader,model,size_seed,hard_seed,use_faq,device)
     wandb.finish()
     del trainer
     del train_loader
@@ -231,7 +272,7 @@ def seqtrain(model, ind_train, ind_val, gene_train, gene_val, config, L=0):
 
 def main():
     parser = argparse.ArgumentParser(description='Main file for creating experiments.')
-    parser.add_argument('command', metavar='c', choices=['train','test', 'train_seq'],
+    parser.add_argument('command', metavar='c', choices=['train','test', 'train_seq', 'chain'],
                     help='Command to execute : train or test')
     parser.add_argument('--n_vertices', type=int, default=0)
     parser.add_argument('--noise', type=float, default=0)
@@ -244,11 +285,17 @@ def main():
     
     training=False
     training_seq = False
+    chaining = False
     if args.command=='train':
         training=True
         default_test = True    
     elif args.command=='train_seq':
         training = True
+        default_test = False
+        training_seq = True
+    elif args.command=='chain':
+        training = False
+        chaining = True
         default_test = False
         training_seq = True
     elif args.command=='test': # will not work!
@@ -279,15 +326,22 @@ def main():
     trainer=None
     if training:
         trainer, model_trained, ind_data_train, ind_data_val = train(config, training_seq)
+    if chaining:
+        model_trained, ind_data_train, ind_data_val = chain(config, training_seq)
     if default_test:
         res_test = test(config, trainer, model_trained)
     if training_seq:
         gene_train, gene_val = get_data(config)
         #new_config = copy.deepcopy(config)
         #new_config['arch']['size_seed'] = -1
-        model = get_siamese_model(config['arch'], config['train'])
+        if chaining:
+            model = model_trained
+        else:
+            model = get_siamese_model(config['arch'], config['train'])
         ind_train, ind_val = ind_data_train, ind_data_val
         for L in range(20):
+            if chaining:
+                L+=1
             model, ind_train, ind_val = seqtrain(model, ind_train, ind_val, gene_train, gene_val, config,L=L)
             
 if __name__=="__main__":

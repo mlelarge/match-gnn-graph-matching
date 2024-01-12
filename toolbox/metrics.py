@@ -108,6 +108,7 @@ def baseline(loader):
     all_b = []
     all_u = []
     all_acc = []
+    all_p = []
     for batch in loader:
         (data1, data2, target) = batch
         g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
@@ -119,11 +120,12 @@ def baseline(loader):
             all_b.append((g1[i]*g2[i]).sum()/2)
             if planted[i].ndim == 2:
                 pl = np.argmax(planted[i],1)
+            all_p.append((g1[i]*g2[i][pl,:][:, pl]).sum()/2)
             Pp = perm2mat(pl)
             res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':Pp})
             all_u.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
             all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
-    return np.array(all_b), np.array(all_u), np.array(all_acc)
+    return np.array(all_b), np.array(all_u), np.array(all_acc), np.array(all_p)
 
 # inspired from the matlab code
 # https://github.com/jovo/FastApproximateQAP/blob/master/code/SGM/relaxed_normAPPB_FW_seeds.m

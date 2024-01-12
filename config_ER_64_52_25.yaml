@@ -1,0 +1,54 @@
+---
+# PB_DIR = experiments-gnn-match/$problem
+name: endy_cER_2res256_64_52_25 # results will be stored in PB_DIR/$name
+cpu: No
+
+data:
+    train: # Train/Val data generation parameters
+        num_examples_train: 2000
+        num_examples_val: 200
+        n_vertices: 64
+        generative_model: ErdosRenyi
+        noise_model: ErdosRenyi
+        edge_density: 0.08125
+        vertex_proba: 1. # Parameter of the binomial distribution of vertices
+        noise: 0.25
+        size_seed: 0
+        hard_seed: No
+            
+    test: #Test data generation parameters not used yet...
+        num_examples_test: 200
+        n_vertices: 64
+        generative_model: ErdosRenyi
+        noise_model: ErdosRenyi
+        edge_density:  0.08125
+        vertex_proba: 1. # Parameter of the binomial distribution of vertices
+        noise: 0.25
+        
+train: # Training parameters
+    epochs: 30
+    batch_size:  32 #4
+    lr: !!float 1e-4
+    scheduler_step: 3
+    scheduler_decay: 0.5
+    lr_stop: !!float 1e-7
+    log_freq: 10
+    use_faq: Yes
+    anew: Yes
+    start_model: '/home/mlelarge/experiments-gnn-match/endy_ER_2res256_64_52_25/node_embedding_node_pos_ErdosRenyi_64_0.08125/01-11-24-10-55/'
+
+arch: # Architecture and model
+    node_emb: 
+        type: node_embedding_node_pos
+        #block_init: block_emb
+        block_inside: block_res_mem
+        #block_inside: block
+        num_blocks: 2
+        in_features: 256
+        out_features: 256
+        depth_of_mlp: 2
+    #size_seed: -1 # -1 for Identity
+
+observers:
+    wandb: Yes
+

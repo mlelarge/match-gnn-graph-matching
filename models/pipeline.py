@@ -7,7 +7,7 @@ import copy
 from toolbox.metrics import get_all_acc, all_acc_qap, baseline, all_qap_chain
 import numpy as np
 
-class Test_Pipeline:
+class Pipeline:
     def __init__(self, path_config, data_pb_dir):
         self.path_config = path_config
         self.data_pb_dir = data_pb_dir
@@ -18,7 +18,7 @@ class Test_Pipeline:
         self.size_seed = self.data['train']['size_seed']
         self.hard_seed = self.data['train']['hard_seed']
         
-    def create_first_loader(self, noise, name='test'):
+    def create_first_dataset(self, noise, name='test'):
         if name == 'test':
             data = copy.deepcopy(self.data['test'])
         else:
@@ -27,57 +27,67 @@ class Test_Pipeline:
         generator = dg.QAP_Generator
         dataset = generator(name, data, self.data_pb_dir)
         dataset.load_dataset()
-        self.dataset = dataset
+        #self.dataset = dataset
         if name == 'train':
             dataset_val = generator('val', data, self.data_pb_dir)
             dataset_val.load_dataset()
-            self.dataset_val = dataset_val
-            return siamese_loader(dataset,batch_size=1, shuffle=False), siamese_loader(dataset_val,batch_size=1, shuffle=False)
+            #self.dataset_val = dataset_val
+            return prep.preprocess(dataset, self.size_seed, self.hard_seed), prep.preprocess(dataset_val, self.size_seed, self.hard_seed)
         else:
-            return siamese_loader(dataset,batch_size=1, shuffle=False)
+            return prep.preprocess(dataset, self.size_seed, self.hard_seed)
     
-    def create_loader(self, loader, model):
-        ind = dg.all_seed(loader,model,self.size_seed,self.hard_seed,self.device)
-        new_dataset = prep.make_seed_from_ind_label(self.dataset,ind)
-        return siamese_loader(new_dataset, batch_size=1, shuffle=False)
+    def create_dataset(self, dataset, model, use_faq=False):#, get_dataset =False ):
+        loader = siamese_loader(dataset, batch_size=1, shuffle=False)
+        ind = dg.all_seed(loader,model,self.size_seed,self.hard_seed,use_faq,self.device)
+        new_dataset = prep.make_seed_from_ind_label(dataset,ind)
+        #if get_dataset:
+        return new_dataset
+        #else:
+        #    return siamese_loader(new_dataset, batch_size=1, shuffle=False)
     
     def iterate_over_models(self, noise, name='test', max_iter=None, verbose = True):
         # possible name: 'train', 'test'
         self.name = name
         if name == 'train':
-            train_loader, loader = self.create_first_loader(noise, name=self.name)
+            train_dataset, dataset = self.create_first_dataset(noise, name=self.name)
         else:
-            loader = self.create_first_loader(noise, name=self.name)
+            dataset = self.create_first_dataset(noise, name=self.name)
         all_acc = []
         all_qap_f = []
         if max_iter is None:
             max_iter = len(self.sorted_names)
         for (i,model_name) in enumerate(self.sorted_names):
             model = get_siamese_model_test(model_name, self.config_model)
+            loader = siamese_loader(dataset, batch_size=1, shuffle=False)
             acc = get_all_acc(loader, model, self.device)
             all_acc.append(acc)
             if verbose:
                 print('Model %s with mean accuracy' % i , np.mean(acc))
             if i < max_iter-1:
                 if self.name == 'test':
-                    loader = self.create_loader(loader, model)
+                    dataset = self.create_dataset(dataset, model)
                 else:
-                    train_loader = self.create_loader(train_loader, model)
-                    loader = self.create_loader(loader, model)
+                    train_dataset = self.create_dataset(train_dataset, model)
+                    dataset = self.create_dataset(dataset, model)
             else:
                 break
-        acc_f, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
-        all_acc.append(acc_f)
+        _, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
+        #all_acc.append(acc_f)
         self.last_model = model
-        self.last_loader = loader
+        self.last_dataset = dataset
         if name == 'train':
-            self.last_train_loader = train_loader
+            self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
     
+    def get_model_datasets(self, noise, max_iter=None):
+        _ = self.iterate_over_models(noise, name='train', max_iter=max_iter)
+        return self.last_model, self.create_dataset(self.last_train_dataset, self.last_model, use_faq=True), self.create_dataset(self.last_dataset, self.last_model, use_faq=True)
+
     def get_baseline(self, noise):
-        loader = self.create_first_loader(noise, name='test')
+        dataset= self.create_first_dataset(noise, name='test')
+        loader = siamese_loader(dataset, batch_size=1, shuffle=False)
         return baseline(loader)
     
     def chain_faq(self):
-        return all_qap_chain(self.last_loader, self.last_model, self.device)
+        return all_qap_chain(siamese_loader(self.last_dataset, batch_size=1, shuffle=False), self.last_model, self.device)
 
