@@ -94,7 +94,7 @@ class Pipeline:
             _, all_qap, _ = all_acc_qap(loader, model, self.device)
             all_qap_f.append(all_qap)
             if verbose:
-                print('Model %s with mean qap' % i , np.mean(all_qap))
+                print('Model init with mean qap', np.mean(all_qap))
         dataset = self.create_dataset(dataset, model)
         model_name = self.sorted_names[1]
         model = get_siamese_model_test(model_name, self.config_model)
