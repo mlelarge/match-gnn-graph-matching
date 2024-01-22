@@ -110,6 +110,8 @@ class Pipeline:
                 all_qap_f.append(all_qap)
                 if verbose:
                     print('Model %s with mean qap' % i , np.mean(all_qap))
+            self.last_model = model
+            self.last_dataset = dataset
         return all_acc, all_qap_f
 
     
