@@ -79,7 +79,7 @@ class Pipeline:
             self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
     
-    def loop_over_model(self, noise, max_iter=10, compute_qap=True, verbose=True, use_faq=False):
+    def loop_over_model(self, noise, max_iter=10, compute_qap=True, verbose=True, model_index = 1, use_faq=False):
         dataset = self.create_first_dataset(noise, name='test')
         all_acc = []
         all_qap_f = []
@@ -96,7 +96,7 @@ class Pipeline:
             if verbose:
                 print('Model init with mean qap', np.mean(all_qap))
         dataset = self.create_dataset(dataset, model, use_faq)
-        model_name = self.sorted_names[1]
+        model_name = self.sorted_names[model_index]
         model = get_siamese_model_test(model_name, self.config_model)
         for i in range(1,max_iter):
             loader = siamese_loader(dataset, batch_size=1, shuffle=False)
