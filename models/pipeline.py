@@ -83,6 +83,7 @@ class Pipeline:
         dataset = self.create_first_dataset(noise, name='test')
         all_acc = []
         all_qap_f = []
+        count_dec = 0
         model_name = self.sorted_names[0]
         model = get_siamese_model_test(model_name, self.config_model)
         loader = siamese_loader(dataset, batch_size=1, shuffle=False)
@@ -93,6 +94,7 @@ class Pipeline:
         if compute_qap:
             _, all_qap, _ = all_acc_qap(loader, model, self.device)
             all_qap_f.append(all_qap)
+            best_qap = np.mean(all_qap)
             if verbose:
                 print('Model init with mean qap', np.mean(all_qap))
         dataset = self.create_dataset(dataset, model, use_faq)
@@ -110,8 +112,12 @@ class Pipeline:
                 all_qap_f.append(all_qap)
                 if verbose:
                     print('Model %s with mean qap' % i , np.mean(all_qap))
-            self.last_model = model
+                if np.mean(all_qap) > best_qap:
+                    count_dec +=1
             self.last_dataset = dataset
+            if count_dec > 2:
+                break
+        self.last_model = model
         return all_acc, all_qap_f
 
     
