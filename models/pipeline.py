@@ -93,12 +93,15 @@ class Pipeline:
         if compute_qap:
             _, all_qap, _ = all_acc_qap(loader, model, self.device)
             all_qap_f.append(all_qap)
+            if verbose:
+                print('Model %s with mean qap' % i , np.mean(all_qap))
+        dataset = self.create_dataset(dataset, model)
         model_name = self.sorted_names[1]
         model = get_siamese_model_test(model_name, self.config_model)
-        for i in range(max_iter-1):
-            dataset = self.create_dataset(dataset, model)
+        for i in range(1,max_iter):
             loader = siamese_loader(dataset, batch_size=1, shuffle=False)
             acc = get_all_acc(loader, model, self.device)
+            dataset = self.create_dataset(dataset, model)
             all_acc.append(acc)
             if verbose:
                 print('Model %s with mean accuracy' % i , np.mean(acc))
