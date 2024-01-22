@@ -79,6 +79,34 @@ class Pipeline:
             self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
     
+    def loop_over_model(self, noise, max_iter=10, , compute_qap=True, verbose=True):
+        dataset = self.create_first_dataset(noise, name='test')
+        all_acc = []
+        all_qap_f = []
+        model_name = self.sorted_names[0]
+        model = get_siamese_model_test(model_name, self.config_model)
+        loader = siamese_loader(dataset, batch_size=1, shuffle=False)
+        acc = get_all_acc(loader, model, self.device)
+        all_acc.append(acc)
+        if verbose:
+            print('Model init with mean accuracy', np.mean(acc))
+        if compute_qap:
+            _, all_qap, _ = all_acc_qap(loader, model, self.device)
+            all_qap_f.append(all_qap)
+        model_name = self.sorted_names[1]
+        model = get_siamese_model_test(model_name, self.config_model)
+        for i in range(max_iter-1):
+            dataset = self.create_dataset(dataset, model)
+            acc = get_all_acc(loader, model, self.device)
+            all_acc.append(acc)
+            if verbose:
+                print('Model %s with mean accuracy' % i , np.mean(acc))
+            if compute_qap:
+                _, all_qap, _ = all_acc_qap(loader, model, self.device)
+                all_qap_f.append(all_qap)
+        return all_acc, all_qap_f
+
+    
     def get_model_datasets(self, noise, max_iter=None):
         _ = self.iterate_over_models(noise, name='train', max_iter=max_iter)
         return self.last_model, self.create_dataset(self.last_train_dataset, self.last_model, use_faq=True), self.create_dataset(self.last_dataset, self.last_model, use_faq=True)

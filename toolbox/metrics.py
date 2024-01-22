@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.optimize import quadratic_assignment
+from scipy.special import log_softmax
 
 def accuracy_linear_assignment(rawscores, labels=None, aggregate_score=True):
     """
@@ -10,7 +11,8 @@ def accuracy_linear_assignment(rawscores, labels=None, aggregate_score=True):
     total_n_vertices = 0
     acc = 0
     all_acc = []
-    weights = torch.log_softmax(rawscores,-1)
+    #weights = torch.log_softmax(rawscores,-1)
+    weights = log_softmax(rawscores,axis=-1)
     for i, weight in enumerate(weights):
         if labels is not None:
             label = labels[i].cpu().detach().numpy()
@@ -18,7 +20,7 @@ def accuracy_linear_assignment(rawscores, labels=None, aggregate_score=True):
                 label = np.argmax(label,1)
         else:
             label = np.arange(len(weight))
-        cost = -weight.cpu().detach().numpy()
+        cost = -weight #.cpu().detach().numpy()
         _, preds = linear_sum_assignment(cost)
         if aggregate_score:
             acc += np.sum(preds == label)
@@ -70,8 +72,9 @@ def get_all_acc(loader, model, device):
     for batch in loader:
         batch[0]['input'] = batch[0]['input'].to(device)
         batch[1]['input'] = batch[1]['input'].to(device)
-        rawscores = model(batch[0], batch[1])
-        acc = accuracy_linear_assignment(rawscores.detach().cpu(), labels=batch[2], aggregate_score=False)
+        with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
+            rawscores = model(batch[0], batch[1])
+        acc = accuracy_linear_assignment(rawscores.detach().cpu().numpy(), labels=batch[2], aggregate_score=False)
         all_acc += acc
     return np.array(all_acc)
 
