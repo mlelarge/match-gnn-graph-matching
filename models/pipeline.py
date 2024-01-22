@@ -45,7 +45,7 @@ class Pipeline:
         #else:
         #    return siamese_loader(new_dataset, batch_size=1, shuffle=False)
     
-    def iterate_over_models(self, noise, name='test', max_iter=None, verbose = True):
+    def iterate_over_models(self, noise, name='test', max_iter=None, verbose = True, use_faq=False):
         # possible name: 'train', 'test'
         self.name = name
         if name == 'train':
@@ -65,10 +65,10 @@ class Pipeline:
                 print('Model %s with mean accuracy' % i , np.mean(acc))
             if i < max_iter-1:
                 if self.name == 'test':
-                    dataset = self.create_dataset(dataset, model)
+                    dataset = self.create_dataset(dataset, model, use_faq)
                 else:
-                    train_dataset = self.create_dataset(train_dataset, model)
-                    dataset = self.create_dataset(dataset, model)
+                    train_dataset = self.create_dataset(train_dataset, model, use_faq)
+                    dataset = self.create_dataset(dataset, model, use_faq)
             else:
                 break
         _, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
@@ -79,7 +79,7 @@ class Pipeline:
             self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
     
-    def loop_over_model(self, noise, max_iter=10, compute_qap=True, verbose=True):
+    def loop_over_model(self, noise, max_iter=10, compute_qap=True, verbose=True, use_faq=False):
         dataset = self.create_first_dataset(noise, name='test')
         all_acc = []
         all_qap_f = []
@@ -95,13 +95,13 @@ class Pipeline:
             all_qap_f.append(all_qap)
             if verbose:
                 print('Model init with mean qap', np.mean(all_qap))
-        dataset = self.create_dataset(dataset, model)
+        dataset = self.create_dataset(dataset, model, use_faq)
         model_name = self.sorted_names[1]
         model = get_siamese_model_test(model_name, self.config_model)
         for i in range(1,max_iter):
             loader = siamese_loader(dataset, batch_size=1, shuffle=False)
             acc = get_all_acc(loader, model, self.device)
-            dataset = self.create_dataset(dataset, model)
+            dataset = self.create_dataset(dataset, model, use_faq)
             all_acc.append(acc)
             if verbose:
                 print('Model %s with mean accuracy' % i , np.mean(acc))
