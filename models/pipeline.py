@@ -113,6 +113,9 @@ class Pipeline:
                 if verbose:
                     print('Model %s with mean qap' % i , np.mean(all_qap))
                 if np.mean(all_qap) > best_qap:
+                    best_qap = np.mean(all_qap)
+                    count_dec = 0
+                else:
                     count_dec +=1
             self.last_dataset = dataset
             if count_dec > 2:
