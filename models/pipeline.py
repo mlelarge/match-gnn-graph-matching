@@ -79,10 +79,15 @@ class Pipeline:
             self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
     
-    def loop_over_model(self, noise, max_iter=10, compute_qap=True, verbose=True, model_index = 1, use_faq=False):
+    def loop_over_model(self, noise, max_iter=10, 
+                        compute_qap=True, verbose=True, 
+                        model_index = 1, use_faq=False,
+                        compute_faq=False):
         dataset = self.create_first_dataset(noise, name='test')
         all_acc = []
         all_qap_f = []
+        all_acc_c = []
+        all_qap_c = []
         count_dec = 0
         model_name = self.sorted_names[0]
         model = get_siamese_model_test(model_name, self.config_model)
@@ -118,10 +123,17 @@ class Pipeline:
                 else:
                     count_dec +=1
             self.last_dataset = dataset
+            self.last_model = model
+            if compute_faq:
+                _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+                all_qap_c.append(all_qap_faq)
+                all_acc_c.append(all_acc_faq)
             if count_dec > 2:
                 break
-        self.last_model = model
-        return all_acc, all_qap_f
+        if compute_faq:
+            return all_acc, all_qap_f, all_acc_c, all_qap_c
+        else:
+            return all_acc, all_qap_f,
 
     
     def get_model_datasets(self, noise, max_iter=None):
