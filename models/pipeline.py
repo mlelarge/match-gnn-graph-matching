@@ -116,7 +116,30 @@ class Pipeline:
             all_qap_c.append(all_qap_faq)
             all_acc_c.append(all_acc_faq)
         dataset = self.create_dataset(dataset, model, use_faq)
-        models_iter = self.sorted_names[1:num_modesl+1]
+        model_name = self.sorted_names[1]
+        model = get_siamese_model_test(model_name, self.config_model)
+        loader = siamese_loader(dataset, batch_size=1, shuffle=False)
+        acc = get_all_acc(loader, model, self.device)
+        all_acc.append(acc)
+        if verbose:
+            print('Model bis with mean accuracy', np.mean(acc))
+        if compute_qap:
+            _, all_qap, _ = all_acc_qap(loader, model, self.device)
+            all_qap_f.append(all_qap)
+            best_qap = np.mean(all_qap)
+            count_dec = 0
+            if verbose:
+                print('Model bis with mean qap', best_qap)
+        if compute_faq:
+            self.last_dataset = dataset
+            self.last_model = model
+            _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+            if verbose:
+                print('Model bis with mean fap', np.mean(all_qap_faq))
+            all_qap_c.append(all_qap_faq)
+            all_acc_c.append(all_acc_faq)
+        dataset = self.create_dataset(dataset, model, use_faq)
+        models_iter = self.sorted_names[2:num_modesl+1]
         for iter in range(max_iter):
             if verbose:
                 print('Iteration %s' % iter)
