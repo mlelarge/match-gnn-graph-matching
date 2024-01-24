@@ -126,11 +126,6 @@ class Pipeline:
                 all_acc.append(acc)
                 if verbose:
                     print('Model %s with mean accuracy' % i , np.mean(acc))
-                if self.name == 'test':
-                    dataset = self.create_dataset(dataset, model, use_faq)
-                else:
-                    train_dataset = self.create_dataset(train_dataset, model, use_faq)
-                    dataset = self.create_dataset(dataset, model, use_faq)
                 if compute_qap:
                     _, all_qap, _ = all_acc_qap(loader, model, self.device)
                     all_qap_f.append(all_qap)
@@ -149,6 +144,12 @@ class Pipeline:
                     all_acc_c.append(all_acc_faq)
                     if verbose:
                         print('Model %s with mean fap' % i , np.mean(all_qap_faq))
+                
+                if self.name == 'test':
+                    dataset = self.create_dataset(dataset, model, use_faq)
+                else:
+                    train_dataset = self.create_dataset(train_dataset, model, use_faq)
+                    dataset = self.create_dataset(dataset, model, use_faq)
             #_, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
             #all_acc.append(acc_f)
             #self.last_model = model
