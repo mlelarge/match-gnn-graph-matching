@@ -139,7 +139,7 @@ class Pipeline:
             all_qap_c.append(all_qap_faq)
             all_acc_c.append(all_acc_faq)
         dataset = self.create_dataset(dataset, model, use_faq)
-        models_iter = self.sorted_names[2:num_modesl+1]
+        models_iter = self.sorted_names[2:num_modesl+2]
         for iter in range(max_iter):
             if verbose:
                 print('Iteration %s' % iter)
