@@ -102,6 +102,14 @@ class Pipeline:
             best_qap = np.mean(all_qap)
             if verbose:
                 print('Model init with mean qap', np.mean(all_qap))
+        if compute_faq:
+            self.last_dataset = dataset
+            self.last_model = model
+            _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+            if verbose:
+                print('Model init with mean fap', np.mean(all_qap_faq))
+            all_qap_c.append(all_qap_faq)
+            all_acc_c.append(all_acc_faq)
         dataset = self.create_dataset(dataset, model, use_faq)
         model_name = self.sorted_names[model_index]
         model = get_siamese_model_test(model_name, self.config_model)
@@ -122,17 +130,21 @@ class Pipeline:
                     count_dec = 0
                 else:
                     count_dec +=1
-            self.last_dataset = dataset
-            self.last_model = model
             if compute_faq:
+                self.last_dataset = dataset
+                self.last_model = model
                 _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
                 all_qap_c.append(all_qap_faq)
                 all_acc_c.append(all_acc_faq)
+                if verbose:
+                    print('Model %s with mean fap' % i , np.mean(all_qap_faq))
             if count_dec > 2:
                 break
         if compute_faq:
             return all_acc, all_qap_f, all_acc_c, all_qap_c
         else:
+            self.last_dataset = dataset
+            self.last_model = model
             return all_acc, all_qap_f,
 
     
