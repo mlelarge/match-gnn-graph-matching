@@ -104,6 +104,7 @@ class Pipeline:
             _, all_qap, _ = all_acc_qap(loader, model, self.device)
             all_qap_f.append(all_qap)
             best_qap = np.mean(all_qap)
+            count_dec = 0
             if verbose:
                 print('Model init with mean qap', best_qap)
         if compute_faq:
