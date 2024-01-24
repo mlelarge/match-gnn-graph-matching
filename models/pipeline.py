@@ -45,7 +45,8 @@ class Pipeline:
         #else:
         #    return siamese_loader(new_dataset, batch_size=1, shuffle=False)
     
-    def iterate_over_models(self, noise, name='test', max_iter=None, verbose = True, use_faq=False):
+    def iterate_over_models(self, noise, name='test', max_iter=None,
+                            verbose = True, use_faq=False):
         # possible name: 'train', 'test'
         self.name = name
         if name == 'train':
@@ -78,6 +79,88 @@ class Pipeline:
         if name == 'train':
             self.last_train_dataset = train_dataset
         return all_acc, all_qap_f, all_planted
+    
+    def new_iterate_over_models(self, noise, name='test', max_iter=10,
+                                num_modesl=2, compute_qap=True, verbose = True, 
+                                use_faq=False, compute_faq=False):
+        # possible name: 'train'?, 'test'
+        self.name = name
+        if name == 'train':
+            train_dataset, dataset = self.create_first_dataset(noise, name=self.name)
+        else:
+            dataset = self.create_first_dataset(noise, name=self.name)
+        all_acc = []
+        all_qap_f = []
+        all_acc_c = []
+        all_qap_c = []
+        model_name = self.sorted_names[0]
+        model = get_siamese_model_test(model_name, self.config_model)
+        loader = siamese_loader(dataset, batch_size=1, shuffle=False)
+        acc = get_all_acc(loader, model, self.device)
+        all_acc.append(acc)
+        if verbose:
+            print('Model init with mean accuracy', np.mean(acc))
+        if compute_qap:
+            _, all_qap, _ = all_acc_qap(loader, model, self.device)
+            all_qap_f.append(all_qap)
+            best_qap = np.mean(all_qap)
+            if verbose:
+                print('Model init with mean qap', best_qap)
+        if compute_faq:
+            self.last_dataset = dataset
+            self.last_model = model
+            _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+            if verbose:
+                print('Model init with mean fap', np.mean(all_qap_faq))
+            all_qap_c.append(all_qap_faq)
+            all_acc_c.append(all_acc_faq)
+        dataset = self.create_dataset(dataset, model, use_faq)
+        models_iter = self.sorted_names[1:num_modesl+1]
+        for iter in range(max_iter):
+            if verbose:
+                print('Iteration %s' % iter)
+            for (i,model_name) in enumerate(models_iter):
+                model = get_siamese_model_test(model_name, self.config_model)
+                loader = siamese_loader(dataset, batch_size=1, shuffle=False)
+                acc = get_all_acc(loader, model, self.device)
+                all_acc.append(acc)
+                if verbose:
+                    print('Model %s with mean accuracy' % i , np.mean(acc))
+                if self.name == 'test':
+                    dataset = self.create_dataset(dataset, model, use_faq)
+                else:
+                    train_dataset = self.create_dataset(train_dataset, model, use_faq)
+                    dataset = self.create_dataset(dataset, model, use_faq)
+                if compute_qap:
+                    _, all_qap, _ = all_acc_qap(loader, model, self.device)
+                    all_qap_f.append(all_qap)
+                    if verbose:
+                        print('Model %s with mean qap' % i , np.mean(all_qap))
+                    if np.mean(all_qap) > best_qap:
+                        best_qap = np.mean(all_qap)
+                        count_dec = 0
+                    else:
+                        count_dec +=1
+                if compute_faq:
+                    self.last_dataset = dataset
+                    self.last_model = model
+                    _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+                    all_qap_c.append(all_qap_faq)
+                    all_acc_c.append(all_acc_faq)
+                    if verbose:
+                        print('Model %s with mean fap' % i , np.mean(all_qap_faq))
+            #_, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
+            #all_acc.append(acc_f)
+            #self.last_model = model
+            #self.last_dataset = dataset
+        if name == 'train':
+            self.last_train_dataset = train_dataset
+        if compute_faq:
+            return all_acc, all_qap_f, all_acc_c, all_qap_c
+        else:
+            self.last_dataset = dataset
+            self.last_model = model
+            return all_acc, all_qap_f
     
     def loop_over_model(self, noise, max_iter=10, 
                         compute_qap=True, verbose=True, 
@@ -145,7 +228,7 @@ class Pipeline:
         else:
             self.last_dataset = dataset
             self.last_model = model
-            return all_acc, all_qap_f,
+            return all_acc, all_qap_f
 
     
     def get_model_datasets(self, noise, max_iter=None):
