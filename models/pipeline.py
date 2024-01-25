@@ -174,6 +174,8 @@ class Pipeline:
                 else:
                     train_dataset = self.create_dataset(train_dataset, model, use_faq)
                     dataset = self.create_dataset(dataset, model, use_faq)
+            if count_dec > 5:
+                break
             #_, all_qap_f, all_planted = all_acc_qap(loader, model, self.device)
             #all_acc.append(acc_f)
             #self.last_model = model
