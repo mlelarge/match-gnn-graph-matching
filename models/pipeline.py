@@ -46,7 +46,8 @@ class Pipeline:
         #    return siamese_loader(new_dataset, batch_size=1, shuffle=False)
     
     def iterate_over_models(self, noise, name='test', max_iter=None,
-                            verbose = True, use_faq=False):
+                            verbose = True, use_faq=False
+                            , compute_faq=False):
         # possible name: 'train', 'test'
         self.name = name
         if name == 'train':
@@ -55,6 +56,8 @@ class Pipeline:
             dataset = self.create_first_dataset(noise, name=self.name)
         all_acc = []
         all_qap_f = []
+        all_acc_c = []
+        all_qap_c = []
         if max_iter is None:
             max_iter = len(self.sorted_names)
         for (i,model_name) in enumerate(self.sorted_names):
@@ -64,6 +67,14 @@ class Pipeline:
             all_acc.append(acc)
             if verbose:
                 print('Model %s with mean accuracy' % i , np.mean(acc))
+            if compute_faq:
+                self.last_dataset = dataset
+                self.last_model = model
+                _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
+                if verbose:
+                    print('Model init with mean fap', np.mean(all_qap_faq))
+                all_qap_c.append(all_qap_faq)
+                all_acc_c.append(all_acc_faq)
             if i < max_iter-1:
                 if self.name == 'test':
                     dataset = self.create_dataset(dataset, model, use_faq)
@@ -78,7 +89,10 @@ class Pipeline:
         self.last_dataset = dataset
         if name == 'train':
             self.last_train_dataset = train_dataset
-        return all_acc, all_qap_f, all_planted
+        if compute_faq:
+            return all_acc, all_qap_f, all_planted, all_acc_c, all_qap_c
+        else:
+            return all_acc, all_qap_f, all_planted
     
     def new_iterate_over_models(self, noise, name='test', max_iter=10,
                                 num_modesl=2, compute_qap=True, verbose = True, 
