@@ -72,7 +72,7 @@ class Pipeline:
                 self.last_model = model
                 _, all_qap_faq, _, all_acc_faq, _ = self.chain_faq()
                 if verbose:
-                    print('Model init with mean fap', np.mean(all_qap_faq))
+                    print('Model %s with mean fap' % i , np.mean(all_qap_faq))
                 all_qap_c.append(all_qap_faq)
                 all_acc_c.append(all_acc_faq)
             if i < max_iter-1:
