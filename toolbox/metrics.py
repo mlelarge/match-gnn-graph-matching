@@ -128,12 +128,8 @@ def baseline(loader):
             Pp = perm2mat(pl)
             res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':Pp})
             all_u.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
-            all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
-    return np.array(all_b), np.array(all_u), np.array(all_acc), np.array(all_p)
-
-# inspired from the matlab code
-# https://github.com/jovo/FastApproximateQAP/blob/master/code/SGM/relaxed_normAPPB_FW_seeds.m
-
+      with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
+        
 
 
 def perm2mat(p):
@@ -248,7 +244,8 @@ def all_qap_chain(loader, model, device):
         (data1, data2, target) = batch
         data1['input'] = data1['input'].to(device)
         data2['input'] = data2['input'].to(device)
-        rawscores = model(data1, data2)
+        with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
+            rawscores = model(data1, data2)
         weights = torch.log_softmax(rawscores,-1)
         g1 = data1['input'][:,0,:,:].cpu().detach().numpy()
         g2 = data2['input'][:,0,:,:].cpu().detach().numpy()
