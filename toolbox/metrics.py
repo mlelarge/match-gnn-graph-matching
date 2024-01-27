@@ -89,7 +89,8 @@ def all_acc_qap(loader, model, device):
     for (data1, data2, label) in loader:
         data1['input'] = data1['input'].to(device)
         data2['input'] = data2['input'].to(device)
-        rawscores = model(data1, data2)
+        with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
+            rawscores = model(data1, data2)
         weights = torch.log_softmax(rawscores,-1)
         g1 = data1['input'][:,0,:].cpu().detach().numpy()
         g2 = data2['input'][:,0,:].cpu().detach().numpy()
