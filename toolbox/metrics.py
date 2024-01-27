@@ -128,8 +128,12 @@ def baseline(loader):
             Pp = perm2mat(pl)
             res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':Pp})
             all_u.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
-      with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
-        
+            all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
+    return np.array(all_b), np.array(all_u), np.array(all_acc), np.array(all_p)
+
+# inspired from the matlab code
+# https://github.com/jovo/FastApproximateQAP/blob/master/code/SGM/relaxed_normAPPB_FW_seeds.m
+
 
 
 def perm2mat(p):
