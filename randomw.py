@@ -57,6 +57,7 @@ list_noises = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
 
 model_r = get_siamese_model(config_model['arch'], config_model['train'])
 model_r = model_r.half()
+model_r = model_r.to(device)
 data_pb_dir = DATA_PB_DIR
 t_pipeline_ER = Pipeline(path_config,data_pb_dir)
 all_acc_gnn, all_qap_gnn, all_p_gnn, all_qap_gnnc,  all_acc_gnn_c = make_all_rgnn(list_noises,t_pipeline_ER, model_r,device)
