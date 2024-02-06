@@ -59,7 +59,7 @@ def check_paths_update(config, name):
     dic['path_log'] = path_log
 
     utils.check_dir(DATA_PB_DIR)
-    config['data'].update({'path_dataset' : DATA_PB_DIR})
+    #config['data'].update({'path_dataset' : DATA_PB_DIR})
     
     config.update(dic)
     with open(os.path.join(path_log, 'config.json'), 'w') as f:
@@ -78,8 +78,8 @@ def get_param_from_config(config):
 
     use_cuda = not cpu and torch.cuda.is_available()
     device = 'cuda' if use_cuda else 'cpu'
-    size_seed = config['data']['train']['size_seed']
-    hard_seed = config['data']['train']['hard_seed']
+    size_seed = 0 #config['data']['train']['size_seed']
+    hard_seed = False #config['data']['train']['hard_seed']
     if size_seed>0 and not hard_seed:
         size_seed = int(config['data']['train']['n_vertices']/size_seed)
     use_faq = config['train']['use_faq']
@@ -371,7 +371,7 @@ def main():
     if default_test:
         res_test = test(config, trainer, model_trained)
     if training_seq:
-        gene_train, gene_val = get_data(config)
+        gene_train, gene_val = get_data_uni()
         #new_config = copy.deepcopy(config)
         #new_config['arch']['size_seed'] = -1
         if chaining:
@@ -379,7 +379,7 @@ def main():
         else:
             model = get_siamese_model(config['arch'], config['train'])
         ind_train, ind_val = ind_data_train, ind_data_val
-        for L in range(20):
+        for L in range(5):
             if chaining:
                 L+=1
             model, ind_train, ind_val = seqtrain(model, ind_train, ind_val, gene_train, gene_val, config,L=L)
