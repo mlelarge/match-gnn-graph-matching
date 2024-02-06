@@ -28,8 +28,7 @@ def get_config(filename) -> dict:
 
 def custom_name(config):
     l_name = [config['arch']['node_emb']['type'],
-        config['data']['train']['generative_model'], config['data']['train']['n_vertices'],
-        config['data']['train']['edge_density']]
+        'Uni', 500]
     name = "_".join([str(e) for e in l_name])
     return name
 
