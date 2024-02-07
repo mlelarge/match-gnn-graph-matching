@@ -8,13 +8,18 @@ from toolbox.metrics import get_all_acc, all_acc_qap, baseline, all_qap_chain
 import numpy as np
 
 class Pipeline:
-    def __init__(self, path_config, data_pb_dir):
+    def __init__(self, path_config, data_pb_dir, data=None):
         self.path_config = path_config
         self.data_pb_dir = data_pb_dir
         self.config_model, self.device = get_device_config(path_config)
         names = find_and_retrieve_files(path_config)
         self.sorted_names = sorted(names, key=get_file_creation_date, reverse=False)
-        self.data = self.config_model['data']
+        if data is None:
+            self.data = self.config_model['data']
+            #self.size_seed = self.data['train']['size_seed']
+            #self.hard_seed = self.data['train']['hard_seed']
+        else:
+            self.data = data#self.config_model['data']
         self.size_seed = self.data['train']['size_seed']
         self.hard_seed = self.data['train']['hard_seed']
         
