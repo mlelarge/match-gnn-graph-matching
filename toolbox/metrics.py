@@ -149,7 +149,7 @@ def fro_norm(P, A, B):
 def indef_rel(P, A, B):
     return -np.trace(np.transpose(A@P)@(P@B))
 
-def relaxed_normAPPB_FW_seeds(A, B, seeds=0):
+def relaxed_normAPPB_FW_seeds(A, B, seeds=0, max_iter=1000):
     AtA = np.dot(A.T, A)
     BBt = np.dot(B, B.T)
     p = A.shape[0]
@@ -165,18 +165,19 @@ def relaxed_normAPPB_FW_seeds(A, B, seeds=0):
     
     f = f1(P)
     var = 1
-    
-    while not (np.abs(f) < tol) and (var > tol2):
+    s = 0
+
+    while not (np.abs(f) < tol) and (var > tol2) and (s<max_iter):
         fold = f
         
-        grad = np.dot(AtA, P) - np.dot(np.dot(A.T, P), B) - np.dot(np.dot(A, P), B.T) + np.dot(P, BBt)
+        grad = 2*(np.dot(AtA, P) - np.dot(np.dot(A.T, P), B) - np.dot(np.dot(A, P), B.T) + np.dot(P, BBt))
         
         grad[:seeds, :] = 0
         grad[:, :seeds] = 0
         
-        G = np.round(grad)
+        #G = np.round(grad)
         
-        row_ind, col_ind = linear_sum_assignment(G[seeds:, seeds:])
+        row_ind, col_ind = linear_sum_assignment(grad[seeds:, seeds:])
         
         Ps = perm2mat(col_ind)
         Ps[:seeds, :seeds] = np.eye(seeds) 
@@ -194,10 +195,11 @@ def relaxed_normAPPB_FW_seeds(A, B, seeds=0):
         P = Ps4
         
         var = np.abs(f - fold)
+        s += 1
     
-    _, col_ind = linear_sum_assignment(-P)
+    _, col_ind = linear_sum_assignment(-P.T)
     
-    return P, col_ind
+    return P.T, col_ind
 
 def all_qap_scipy(loader):
     all_qap = []
