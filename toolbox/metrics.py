@@ -149,7 +149,7 @@ def fro_norm(P, A, B):
 def indef_rel(P, A, B):
     return -np.trace(np.transpose(A@P)@(P@B))
 
-def relaxed_normAPPB_FW_seeds(A, B, seeds=0, max_iter=1000):
+def relaxed_normAPPB_FW_seeds(A, B, max_iter=1000, seeds=0):
     AtA = np.dot(A.T, A)
     BBt = np.dot(B, B.T)
     p = A.shape[0]
@@ -201,7 +201,7 @@ def relaxed_normAPPB_FW_seeds(A, B, seeds=0, max_iter=1000):
     
     return P.T, col_ind
 
-def all_qap_scipy(loader):
+def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
     all_qap = []
     all_d = []
     all_planted = []
@@ -223,11 +223,11 @@ def all_qap_scipy(loader):
         for i in range(bs):
             if planted[i].ndim == 2:
                 pl = np.argmax(planted[i],1)
-            P, col = relaxed_normAPPB_FW_seeds(g1[i],g2[i],0)
+            P, col = relaxed_normAPPB_FW_seeds(g1[i],g2[i], max_iter=max_iter, seeds=seeds)
             Pp = perm2mat(col)
             all_fd.append(fro_norm(P, g1[i], g2[i]))
             all_fproj.append(fro_norm(Pp, g1[i],g2[i]))
-            res_qap = quadratic_assignment(g1[i],-g2[i],method='faq',options={'P0':P})
+            res_qap = quadratic_assignment(g2[i],-g1[i],method='faq',options={'P0':P})
             P_qap = perm2mat(res_qap['col_ind'])
             all_fqap.append(fro_norm(P_qap, g1[i], g2[i]))
             P_planted = perm2mat(pl)
