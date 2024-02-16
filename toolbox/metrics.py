@@ -222,7 +222,7 @@ def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
         
         for i in range(bs):
             if planted[i].ndim == 2:
-                pl = np.argmax(planted[i],1)
+                pl = np.argmax(planted[i],0)
             P, col = relaxed_normAPPB_FW_seeds(g1[i],g2[i], max_iter=max_iter, seeds=seeds)
             Pp = perm2mat(col)
             all_fd.append(fro_norm(P, g1[i], g2[i]))
