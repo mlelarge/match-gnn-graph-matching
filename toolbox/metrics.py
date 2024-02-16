@@ -234,8 +234,8 @@ def all_qap_scipy(loader, max_iter = 1000, seeds = 0):
             all_fplanted.append(fro_norm(P_planted, g1[i],g2[i]))
             
             all_planted.append((g1[i]*g2[i][pl,:][:, pl]).sum()/2)
-            all_qap.append((g1[i]*g2[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
-            all_d.append((g1[i]*g2[i][col,:][:, col]).sum()/2)
+            all_qap.append((g2[i]*g1[i][res_qap['col_ind'],:][:, res_qap['col_ind']]).sum()/2)
+            all_d.append((g2[i]*g1[i][col,:][:, col]).sum()/2)
             all_acc.append(np.sum(pl==res_qap['col_ind'])/n)
             all_accd.append(np.sum(pl==col)/n)
     return all_planted, all_qap, all_d, all_acc, all_accd, all_fd, all_fproj, all_fqap, all_fplanted
